@@ -1,10 +1,9 @@
 // composables/useWebLLMEngine.client.ts
 import { CreateWebWorkerMLCEngine, CreateMLCEngine } from "@mlc-ai/web-llm";
 
-// 🧰 Vite bundlar workern via ?worker → robust i Netlify build
-// @ts-ignore - Vite tillhandahåller typer via vite/client, men TS kan behöva ignorera här.
-import WebLLMWorker from "../workers/webllm.worker.ts?worker";
-
+// ✅ Vite packar workern åt oss
+// @ts-ignore
+import WebLLMWorker from "./webllm.worker.ts?worker";
 let _enginePromise: Promise<any> | null = null;
 
 function onProgress(p: any, set: (s: string) => void) {
