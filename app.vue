@@ -20,10 +20,12 @@
       </NuxtLayout>
     </main>
 
-    <SiteFooter :slug="bmcSlug" />
+    <SiteFooter :slug="app.bmcSlug" />
   </div>
 </template>
 
 <script setup lang="ts">
-const bmcSlug = (import.meta.env.VITE_BMC_SLUG as string) || 'your-slug' // my BMC-slug
+import { useAppConfig } from 'nuxt/app'
+
+const app = useAppConfig()
 </script>
