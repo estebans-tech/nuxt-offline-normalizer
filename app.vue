@@ -7,6 +7,7 @@
         <NuxtLink to="/" class="font-semibold text-slate-900 dark:text-slate-100">Offline Normalizer</NuxtLink>
         <div class="ml-auto flex items-center gap-4 text-sm">
           <NuxtLink to="/" class="text-slate-700 dark:text-slate-300 hover:underline">Home</NuxtLink>
+          <NuxtLink to="/settings" class="text-slate-700 dark:text-slate-300 hover:underline">Settings</NuxtLink>
           <NuxtLink to="/about" class="text-slate-700 dark:text-slate-300 hover:underline">About</NuxtLink>
           <ThemeToggle />
         </div>
