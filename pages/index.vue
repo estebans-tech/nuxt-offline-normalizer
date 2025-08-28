@@ -13,34 +13,43 @@
           v-model="text"
           rows="6"
           class="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-3 focus:outline-none focus:ring-2 focus:ring-slate-600/20"
-          placeholder="Place your weird text here…">
-        </textarea>
+          placeholder="Skriv något konstigt här…"
+        />
         <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
           <span>Chars: {{ (text || '').length }}</span>
           <span v-if="srcLang">Detected: <strong class="font-medium">{{ srcLang }}</strong></span>
         </div>
       </section>
 
-      <!-- Controls: endast Normalize + status -->
+      <!-- Controls: Normalize + static badge -->
       <section class="flex items-center gap-3">
         <button
           :disabled="running || !(text && text.trim())"
           @click.prevent="onRun"
           class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 text-white px-5 py-2.5 font-medium disabled:opacity-50 hover:bg-slate-800 transition"
         >
-          <span v-if="running" class="inline-flex items-center gap-2"><Spinner /> {{ progress || 'Processing…' }}</span>
-          <span v-else>Normalize</span>
+          <Spinner v-if="running" />
+          <span>Normalize</span>
         </button>
-        <ModelStatusBadge :status="badgeStatus">
-          <span v-if="running">{{ progress }}</span>
-          <span v-else>On-device</span>
-        </ModelStatusBadge>
+
+        <!-- statisk badge: visar endast state, ingen lång text -->
+        <ModelStatusBadge :status="badgeStatus" />
       </section>
 
-      <!-- Progress bar -->
-      <div v-if="running" class="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-        <div class="h-full bg-slate-900 dark:bg-slate-200 transition-all" :style="{ width: progressWidth }"></div>
-      </div>
+      <!-- Status strip: all progress/text hamnar här (inte i knappen/badgen) -->
+      <section
+        v-if="running || displayProgress"
+        class="rounded-xl bg-slate-100/60 dark:bg-slate-800/60 ring-1 ring-black/5 dark:ring-white/10 p-3 space-y-2"
+        role="status" aria-live="polite"
+      >
+        <div class="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
+          <Spinner v-if="running" />
+          <span>{{ displayProgress || 'Working…' }}</span>
+        </div>
+        <div class="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+          <div class="h-full bg-slate-900 dark:bg-slate-200 transition-all" :style="{ width: progressWidth }" />
+        </div>
+      </section>
 
       <!-- Output -->
       <section class="space-y-2">
@@ -50,7 +59,9 @@
         </div>
       </section>
 
-      <p class="text-xs text-slate-500 dark:text-slate-400">Nothing leaves your device. Target language is fixed to English; style is “simple”.</p>
+      <p class="text-xs text-slate-500 dark:text-slate-400">
+        Nothing leaves your device. Target language is fixed to English; style is “simple”.
+      </p>
     </div>
   </div>
 </template>
@@ -59,14 +70,24 @@
 import { useNormalize } from "~/composables/useNormalize"
 
 const { text, result, srcLang, running, progress, initLangs, run } = useNormalize()
-
 onMounted(() => { initLangs() })
-const onRun = () => run("en", "simple") // ← tvinga engelska + simple
+
+const onRun = () => run("en", "simple")
 
 const badgeStatus = computed(() => (running.value ? "loading" : "ready"))
+
+// Rensa och förkorta progress-meddelandet för UI:t
+const displayProgress = computed(() => {
+  const raw = (progress.value ?? '').toString().replace(/\s+/g, ' ').trim()
+  if (!raw) return ''
+  // Lite vänligare text i början av nedladdningen
+  if (/fetching|downloading|loading/i.test(raw)) return raw.replace(/^(\d+%)/, '$1 ').trim()
+  return raw
+})
+
+// Dra ut procent för progressbar, med fallback ~15% när vi saknar procent
 const progressWidth = computed(() => {
-  const txt = (progress.value ?? '').toString()
-  const m = txt.match(/^(\d+)%/)
+  const m = (progress.value ?? '').toString().match(/^(\d+)%/)
   const pct = m ? parseInt(m[1]!, 10) : (running.value ? 15 : 0)
   return `${Math.min(100, Math.max(0, pct))}%`
 })
