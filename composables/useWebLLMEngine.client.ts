@@ -1,82 +1,60 @@
-// composables/useWebLLMEngine.client.ts
-import { ref } from "vue";
-import type { Ref } from "vue";
-import { CreateWebWorkerMLCEngine, CreateMLCEngine } from "@mlc-ai/web-llm";
+import { CreateWebWorkerMLCEngine, CreateMLCEngine } from "@mlc-ai/web-llm"
 
-let _enginePromise: Promise<any> | null = null;
+let _enginePromise: Promise<any> | null = null
+
+function onProgress(p: any, set: (s: string)=>void) {
+  try {
+    const pct = Math.round((p?.progress ?? p?.percent ?? 0) * 100)
+    const stage = p?.text || p?.status || p?.stage || ""
+    set(pct ? `${pct}% ${stage}` : stage || "Loading model…")
+  } catch { set("Loading model…") }
+}
+
+async function createWorker(modelId: string, set: (s: string)=>void) {
+  const worker = new Worker(new URL("../workers/webllm.worker.ts", import.meta.url), { type: "module" })
+  return await CreateWebWorkerMLCEngine(worker, modelId, { initProgressCallback: (p: any) => onProgress(p, set) })
+}
+async function createInline(modelId: string, set: (s: string)=>void) {
+  return await CreateMLCEngine(modelId, { initProgressCallback: (p: any) => onProgress(p, set) })
+}
+function withTimeout<T>(p: Promise<T>, ms = 30000) {
+  return Promise.race([p, new Promise<never>((_, rej)=> setTimeout(()=> rej(new Error("Engine init timeout")), ms))])
+}
 
 export function useWebLLMEngine() {
-  const ready: Ref<boolean> = ref(false);
-  const error: Ref<string | null> = ref(null);
-  const progressText: Ref<string> = ref("");
-
-  function onProgress(p: any) {
-    try {
-      const pct = Math.round((p?.progress ?? p?.percent ?? 0) * 100);
-      const stage = p?.text || p?.status || p?.stage || "";
-      progressText.value = pct ? `${pct}% ${stage}` : stage || "Loading model…";
-    } catch {
-      progressText.value = "Loading model…";
-    }
-  }
-
-  async function createWorkerEngine(modelId: string) {
-    const worker = new Worker(
-      new URL("../workers/webllm.worker.ts", import.meta.url),
-      { type: "module" }
-    );
-    return await CreateWebWorkerMLCEngine(worker, modelId, {
-      initProgressCallback: onProgress,
-    });
-  }
-
-  async function createInlineEngine(modelId: string) {
-    return await CreateMLCEngine(modelId, { initProgressCallback: onProgress });
-  }
-
-  function withTimeout<T>(p: Promise<T>, ms = 45000) {
-    return Promise.race([
-      p,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Engine init timeout")), ms)
-      ),
-    ]);
-  }
+  const ready = ref(false)
+  const error = ref<string | null>(null)
+  const progressText = ref("")
 
   const get = async () => {
-    if (!import.meta.client) {
-      throw new Error("WebLLM can only initialize in the browser.");
-    }
-    if (_enginePromise) return _enginePromise;
+    if (!import.meta.client) throw new Error("WebLLM can only init in browser.")
+    if (_enginePromise) return _enginePromise
 
-    // Läs modell-id från Vite env (ingen Nuxt-alias!)
-    const modelId =
-      (import.meta.env.VITE_WEBLLM_MODEL_ID as string) ||
-      "Qwen2-1.5B-Instruct-q4f16_1-MLC";
+    const stored = localStorage.getItem("webllm:modelId")
+    const fallback = (import.meta.env.VITE_WEBLLM_MODEL_ID as string) || "Qwen2-1.5B-Instruct-q4f16_1-MLC"
+    const modelId = stored || fallback
 
     _enginePromise = (async () => {
       try {
-        // Försök worker först (bäst UX), fallet tillbaka till inline om det inte funkar.
         if (typeof Worker !== "undefined") {
           try {
-            const engine = await withTimeout(createWorkerEngine(modelId), 30000);
-            ready.value = true;
-            return engine;
-          } catch (e) {
-            console.warn("[WebLLM] Worker init failed, falling back to inline:", e);
-          }
+            const e = await withTimeout(createWorker(modelId, (s)=> progressText.value = s), 30000)
+            ready.value = true
+            return e
+          } catch (e) { console.warn("[WebLLM] worker failed, fallback → inline", e) }
         }
-        const engine = await withTimeout(createInlineEngine(modelId), 30000);
-        ready.value = true;
-        return engine;
-      } catch (e: any) {
-        error.value = e?.message || String(e);
-        throw e;
-      }
-    })();
+        const e = await withTimeout(createInline(modelId, (s)=> progressText.value = s), 30000)
+        ready.value = true
+        return e
+      } catch (e: any) { error.value = e?.message || String(e); throw e }
+    })()
 
-    return _enginePromise!;
-  };
+    return _enginePromise
+  }
 
-  return { get, ready, error, progressText };
+  return { get, ready, error, progressText }
+}
+
+export function resetWebLLMEngine() {
+  _enginePromise = null
 }

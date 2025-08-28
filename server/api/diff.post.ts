@@ -1,4 +1,5 @@
-import { readBody } from 'h3'
+import { defineEventHandler, readBody } from 'h3'
+// @ts-ignore
 import { diff_match_patch } from 'diff-match-patch'
 
 

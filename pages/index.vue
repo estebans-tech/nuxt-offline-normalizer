@@ -1,80 +1,73 @@
 <template>
-  <div class="mx-auto max-w-3xl p-6 space-y-6">
-    <header class="space-y-2">
-      <h1 class="text-2xl font-semibold">Offline Normalizer</h1>
-      <p class="text-sm text-gray-600">Rewrite odd sentences into clear, standard language — fully on your device.</p>
-    </header>
+  <div class="mx-auto max-w-3xl px-6 py-10">
+    <div class="rounded-2xl bg-white/90 dark:bg-slate-900/70 backdrop-blur shadow-lg ring-1 ring-black/5 dark:ring-white/10 p-6 space-y-6">
+      <header>
+        <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Offline Normalizer</h1>
+        <p class="text-sm text-slate-600 dark:text-slate-400">Clear, simple English rewrites — on your device.</p>
+      </header>
 
-    <section class="space-y-3">
-      <label class="text-sm font-medium">Your text</label>
-      <textarea v-model="text" rows="6" class="w-full rounded-lg border p-3" placeholder="Skriv något konstigt här…"></textarea>
-      <p class="text-xs text-gray-500">Chars: {{ (text || '').length }}</p>
-    </section>
+      <!-- Input -->
+      <section class="space-y-2">
+        <label class="text-sm font-medium text-slate-700 dark:text-slate-300">Your text</label>
+        <textarea
+          v-model="text"
+          rows="6"
+          class="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-3 focus:outline-none focus:ring-2 focus:ring-slate-600/20"
+          placeholder="Place your weird text here…">
+        </textarea>
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span>Chars: {{ (text || '').length }}</span>
+          <span v-if="srcLang">Detected: <strong class="font-medium">{{ srcLang }}</strong></span>
+        </div>
+      </section>
 
-    <section class="flex gap-3 items-end flex-wrap">
-      <div>
-        <label class="text-sm font-medium">Target language</label>
-        <select v-model="target" class="block rounded-lg border p-2">
-          <option v-for="l in langs" :key="l" :value="l">{{ label(l) }}</option>
-        </select>
+      <!-- Controls: endast Normalize + status -->
+      <section class="flex items-center gap-3">
+        <button
+          :disabled="running || !(text && text.trim())"
+          @click.prevent="onRun"
+          class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 text-white px-5 py-2.5 font-medium disabled:opacity-50 hover:bg-slate-800 transition"
+        >
+          <span v-if="running" class="inline-flex items-center gap-2"><Spinner /> {{ progress || 'Processing…' }}</span>
+          <span v-else>Normalize</span>
+        </button>
+        <ModelStatusBadge :status="badgeStatus">
+          <span v-if="running">{{ progress }}</span>
+          <span v-else>On-device</span>
+        </ModelStatusBadge>
+      </section>
+
+      <!-- Progress bar -->
+      <div v-if="running" class="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+        <div class="h-full bg-slate-900 dark:bg-slate-200 transition-all" :style="{ width: progressWidth }"></div>
       </div>
-      <div>
-        <label class="text-sm font-medium">Style</label>
-        <select v-model="style" class="block rounded-lg border p-2">
-          <option value="neutral">Neutral</option>
-          <option value="concise">Concise</option>
-          <option value="formal">Formal</option>
-          <option value="simple">Simple</option>
-        </select>
-      </div>
-      <button :disabled="running || !(text && text.trim())" @click.prevent="onRun" class="rounded-lg bg-black text-white px-4 py-2 disabled:opacity-50">
-        <span v-if="running" class="inline-flex items-center gap-2"><Spinner /> {{ progress || 'Processing…' }}</span>
-        <span v-else>Normalize</span>
-      </button>
-      <ModelStatusBadge :status="badgeStatus">
-        <span v-if="running">{{ progress }}</span>
-        <span v-else>On-device</span>
-      </ModelStatusBadge>
-    </section>
 
-    <!-- ALLTID synlig resultatruta -->
-    <section class="space-y-2">
-      <label class="text-sm font-medium">Result</label>
-      <div class="rounded-lg border p-3 whitespace-pre-wrap min-h-24">
-        {{ result || '— (no output yet)' }}
-      </div>
-    </section>
+      <!-- Output -->
+      <section class="space-y-2">
+        <label class="text-sm font-medium text-slate-700 dark:text-slate-300">Result</label>
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 whitespace-pre-wrap min-h-[6rem]">
+          {{ result || '— (no output yet)' }}
+        </div>
+      </section>
 
-    <footer class="text-xs text-gray-500">
-      Language detected: <strong>{{ srcLang || "—" }}</strong>. Nothing leaves your device.
-    </footer>
-
-    <!-- Mini debug-panel -->
-    <details class="text-xs text-gray-500 mt-4">
-      <summary>Debug</summary>
-      <div>running: {{ running ? 'yes' : 'no' }}</div>
-      <div>progress: {{ progress }}</div>
-      <div>resultLen: {{ (result || '').length }}</div>
-    </details>
+      <p class="text-xs text-slate-500 dark:text-slate-400">Nothing leaves your device. Target language is fixed to English; style is “simple”.</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useNormalize } from "~/composables/useNormalize"; // explicit import
-const style = ref<"neutral" | "concise" | "formal" | "simple">("neutral");
+import { useNormalize } from "~/composables/useNormalize"
 
-const { text, result, srcLang, langs, target, running, progress, initLangs, run } = useNormalize();
+const { text, result, srcLang, running, progress, initLangs, run } = useNormalize()
 
-onMounted(() => { initLangs(); });
+onMounted(() => { initLangs() })
+const onRun = () => run("en", "simple") // ← tvinga engelska + simple
 
-const onRun = () => {
-  console.log("[page] click Normalize");
-  run(target.value, style.value);
-};
-
-const badgeStatus = computed(() => (running.value ? "loading" : "ready"));
-
-function label(code: string) {
-  return ({ en: "English", de: "Deutsch", es: "Español", sv: "Svenska" } as any)[code] || code;
-}
+const badgeStatus = computed(() => (running.value ? "loading" : "ready"))
+const progressWidth = computed(() => {
+  const txt = (progress.value ?? '').toString()
+  const m = txt.match(/^(\d+)%/)
+  const pct = m ? parseInt(m[1]!, 10) : (running.value ? 15 : 0)
+  return `${Math.min(100, Math.max(0, pct))}%`
+})
 </script>
