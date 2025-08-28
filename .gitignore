@@ -1,0 +1,9 @@
+# Node/Nuxt
+node_modules
+.nitro
+.output
+.nuxt
+.DS_Store
+.env*
+
+.yarn/*
